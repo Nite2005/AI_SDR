@@ -604,7 +604,7 @@ async def process_streaming_transcript(call_sid: str):
     if conn.user_speech_detected and conn.vad_triggered_time:
         vad_duration = now - conn.vad_triggered_time
         if vad_duration > conn.vad_timeout:
-            _logger.warning(f"⚠️ Clearing stuck VAD")
+            _logger.info(f"⚠️ VAD timeout cleared (duration: {vad_duration:.1f}s)")
             conn.user_speech_detected = False
             conn.speech_start_time = None
             conn.vad_triggered_time = None
@@ -1269,10 +1269,11 @@ async def media_ws(websocket: WebSocket):
                         )
                         conn.resampler_state = dummy_state
                         conn.resampler_initialized = True
-                        _logger.info("🎵 Resampler pre-initialized")
+                        _logger.info("✅ Resampler pre-initialized successfully")
                     except Exception as e:
-                        _logger.warning("Failed to pre-init resampler: %s", e)
-                    
+                        _logger.warning("⚠️ Resampler pre-init failed (non-critical): %s", e)
+                        # This is not critical - audio will still work, just with less optimization
+
                     await setup_streaming_stt(current_call_sid)
                     conn.tts_task = asyncio.create_task(stream_tts_worker(current_call_sid))
                     _logger.info(f"✅ Voice pipeline started")

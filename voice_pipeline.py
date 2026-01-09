@@ -245,12 +245,11 @@ class WSConn:
 
         # Pending action confirmation
         self.pending_action: Optional[dict] = None
-
         # VAD validation
         self.vad_triggered_time: Optional[float] = None
         self.vad_validation_threshold: float = 0.3
         self.vad_validated: bool = False
-        self.vad_timeout: float = 5.0
+        self.vad_timeout: float = 2.0  # Reduced from 5.0 to 2.0 seconds for faster response
         self.energy_drop_time: Optional[float] = None
         self.last_valid_speech_energy: float = 0.0
 
