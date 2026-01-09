@@ -82,11 +82,11 @@ WEBHOOK_EVENTS = [
 # LOGGING CONFIGURATION
 # ================================
 
-LOG_LEVEL = os.getenv("LOG_LEVEL", "WARNING").upper()
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 LOG_FILE = os.getenv("LOG_FILE", "server.log")
 
 _logger = logging.getLogger("new")
-_logger.setLevel(getattr(logging, LOG_LEVEL, logging.WARNING))
+_logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
 
 _fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s")
 _ch = logging.StreamHandler()
@@ -165,6 +165,17 @@ twilio_client = TwilioClient(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
 deepgram_config = DeepgramClientOptions(options={"keepalive": "true", "timeout": "60"})
 deepgram = DeepgramClient(DEEPGRAM_API_KEY, config=deepgram_config)
+
+# Test Deepgram connection at startup
+try:
+    _logger.info(f"🎤 Testing Deepgram API connection...")
+    # This won't actually test the connection until we use it, but we can at least verify the client is created
+    if DEEPGRAM_API_KEY:
+        _logger.info(f"✅ Deepgram API key configured")
+    else:
+        _logger.error(f"❌ Deepgram API key NOT configured!")
+except Exception as e:
+    _logger.error(f"❌ Deepgram initialization failed: {e}")
 
 # 🚀 GPU-ACCELERATED EMBEDDING MODEL
 _logger.info(f"📦 Loading SentenceTransformer on {DEVICE}...")

@@ -1,6 +1,14 @@
-2026-01-09 21:19:53,945 WARNING new ============================================================
-2026-01-09 21:19:54,018 WARNING new ============================================================
-2026-01-09 21:21:36,173 WARNING new ============================================================
-2026-01-09 21:21:36,180 WARNING new ============================================================
-2026-01-09 21:22:06,264 WARNING new ============================================================
-2026-01-09 21:22:06,270 WARNING new ============================================================
+INFO:     Started server process [186242]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:9001 (Press CTRL+C to quit)
+INFO:     49.36.240.243:0 - "POST /v1/convai/twilio/outbound-call HTTP/1.1" 200 OK
+INFO:     18.209.106.110:0 - "POST /voice/status HTTP/1.1" 404 Not Found
+INFO:     54.89.92.223:0 - "POST /voice/status HTTP/1.1" 404 Not Found
+INFO:     54.166.151.75:0 - "POST /voice/status HTTP/1.1" 404 Not Found
+INFO:     54.226.140.96:0 - "POST /voice/outbound HTTP/1.1" 200 OK
+INFO:     54.175.139.142:0 - "WebSocket /media-stream" [accepted]
+INFO:     connection open
+2026-01-09 17:19:13,328 WARNING new ⚠️ Clearing stuck VAD
+INFO:     34.229.174.235:0 - "POST /voice/status HTTP/1.1" 404 Not Found
+INFO:     connection closed

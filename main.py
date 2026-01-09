@@ -17,6 +17,7 @@ from fastapi.security import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 from twilio.twiml.voice_response import VoiceResponse, Connect
 from sqlalchemy.orm import Session
+import ollama
 
 # Import all submodules
 from models import (
@@ -38,7 +39,7 @@ from utils import (
 )
 from voice_pipeline import (
     manager, stream_tts_worker, setup_streaming_stt, speak_text_streaming,
-    ConnectionManager
+    ConnectionManager, audioop
 )
 
 # Global call data storage
@@ -434,6 +435,7 @@ Respond naturally and briefly:"""
     def _producer():
         nonlocal full_response
         try:
+            _logger.info(f"🤖 Calling Ollama with model: {model_to_use}")
             for chunk in ollama.generate(
                 model=model_to_use,
                 prompt=prompt,
@@ -456,7 +458,9 @@ Respond naturally and briefly:"""
                     full_response += token
                     loop.call_soon_threadsafe(_safe_put, token)
             loop.call_soon_threadsafe(_safe_put, None)
+            _logger.info(f"✅ Ollama generation completed: {len(full_response)} chars")
         except Exception as e:
+            _logger.error(f"❌ Ollama error: {e}", exc_info=True)
             loop.call_soon_threadsafe(_safe_put, {"__error__": str(e)})
 
     loop.run_in_executor(None, _producer)
@@ -579,8 +583,15 @@ async def handle_call_end(call_sid: str, reason: str):
 
 async def process_streaming_transcript(call_sid: str):
     """Process user transcript and generate response"""
+    _logger.debug(f"🔄 process_streaming_transcript called for {call_sid}")
+    
     conn = manager.get(call_sid)
-    if not conn or conn.is_responding:
+    if not conn:
+        _logger.debug("No connection found")
+        return
+    
+    if conn.is_responding:
+        _logger.debug("Already responding")
         return
 
     if conn.interrupt_requested:
@@ -618,7 +629,7 @@ async def process_streaming_transcript(call_sid: str):
         return
 
     # Check silence threshold
-    if not conn.last_speech_time:
+    if conn.last_speech_time is None:
         _logger.debug("⸸ No speech time recorded")
         return
 
@@ -1296,19 +1307,22 @@ async def media_ws(websocket: WebSocket):
                 payload_b64 = media_data.get("payload")
 
                 if payload_b64:
+                    _logger.info(f"📞 Received media chunk ({len(payload_b64)} bytes)")
+
                     try:
                         import base64
                         chunk = base64.b64decode(payload_b64)
                         conn = manager.get(current_call_sid)
 
                         if not conn:
+                            _logger.warning("Connection not found for call_sid: %s", current_call_sid)
                             continue
 
                         if conn.deepgram_live:
                             try:
                                 conn.deepgram_live.send(chunk)
                             except Exception as e:
-                                pass
+                                _logger.error(f"Error sending audio to Deepgram: {e}")
 
                         from voice_pipeline import calculate_audio_energy, update_baseline
                         energy = calculate_audio_energy(chunk)
@@ -1332,7 +1346,7 @@ async def media_ws(websocket: WebSocket):
                                 )
 
                     except Exception as e:
-                        pass
+                        _logger.error(f"Error processing media: {e}")
 
             elif event == "stop":
                 break

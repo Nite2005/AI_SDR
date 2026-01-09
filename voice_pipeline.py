@@ -10,6 +10,7 @@ import time
 import struct
 import io
 import wave
+import os
 try:
     import audioop
 except ImportError:
@@ -220,7 +221,7 @@ class WSConn:
         self.deepgram_live = None
         self.stt_transcript_buffer: str = ""
         self.stt_is_final: bool = False
-        self.last_speech_time: float = 0
+        self.last_speech_time: Optional[float] = None
         self.silence_start: Optional[float] = None
 
         # Streaming TTS
@@ -667,9 +668,11 @@ async def setup_streaming_stt(call_sid: str):
     """Setup Deepgram streaming STT"""
     conn = manager.get(call_sid)
     if not conn:
+        _logger.error("❌ Connection not found for call_sid: %s", call_sid)
         return
 
     try:
+        _logger.info("🎤 Creating Deepgram live connection...")
         dg_connection = deepgram.listen.live.v("1")
 
         def on_message(self, result, **kwargs):
@@ -715,16 +718,16 @@ async def setup_streaming_stt(call_sid: str):
                         _logger.info(f"🎙️ Interim as buffer: '{transcript}'")
 
             except Exception as e:
-                pass
+                _logger.error(f"❌ Error in on_message: {e}")
 
         def on_open(self, open, **kwargs):
-            pass
+            _logger.info("✅ Deepgram connection opened")
 
         def on_error(self, error, **kwargs):
-            pass
+            _logger.error(f"❌ Deepgram error: {error}")
 
         def on_close(self, close_msg, **kwargs):
-            pass
+            _logger.info("🔌 Deepgram connection closed")
 
         def on_speech_started(self, speech_started, **kwargs):
             conn.vad_triggered_time = time.time()
@@ -770,9 +773,11 @@ async def setup_streaming_stt(call_sid: str):
 
         start_ok = False
         try:
+            _logger.info("🎤 Starting Deepgram with options: %s", options)
             start_ok = dg_connection.start(options)
+            _logger.info("✅ Deepgram start() returned: %s", start_ok)
         except Exception as e:
-            pass
+            _logger.error(f"❌ Deepgram start failed: {e}")
 
         if not start_ok:
             fallback = LiveOptions(
@@ -782,8 +787,10 @@ async def setup_streaming_stt(call_sid: str):
                 interim_results=True,
             )
             try:
+                _logger.info("🎤 Trying fallback Deepgram model...")
                 start_ok = dg_connection.start(fallback)
             except Exception as e2:
+                _logger.error(f"❌ Fallback failed: {e2}")
                 return
 
         if start_ok:
@@ -793,4 +800,4 @@ async def setup_streaming_stt(call_sid: str):
             _logger.error("❌ Deepgram start() returned False")
 
     except Exception as e:
-        pass
+        _logger.error(f"❌ Setup streaming STT failed: {e}")
