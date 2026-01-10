@@ -4184,4 +4184,3 @@ async def voice_outbound(request: Request):
     response.append(connect)
 
     return Response(content=str(response), media_type="application/xml")
-

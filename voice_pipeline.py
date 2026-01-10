@@ -345,15 +345,16 @@ def update_baseline(conn: WSConn, energy: int):
 
 
 async def handle_interrupt(call_sid: str):
-    """Handle user interruption"""
+    """Handle user interruption with seamless transition"""
     conn = manager.get(call_sid)
     if not conn:
         return
 
-    _logger.info("🛑 INTERRUPT - Stopping playback and clearing buffers")
+    _logger.info("🛑 INTERRUPT - Seamless transition to user input")
 
     conn.interrupt_requested = True
 
+    # Immediately clear the TTS queue for instant response
     cleared = 0
     while not conn.tts_queue.empty():
         try:
@@ -363,6 +364,7 @@ async def handle_interrupt(call_sid: str):
         except:
             break
 
+    # Send media clear command to Twilio for instant audio cutoff
     try:
         if conn.stream_sid:
             await conn.ws.send_json({
@@ -372,13 +374,15 @@ async def handle_interrupt(call_sid: str):
     except:
         pass
 
-    old_buffer = conn.stt_transcript_buffer
+    # Reset buffers and flags for seamless transition
     conn.stt_transcript_buffer = ""
     conn.stt_is_final = False
     conn.last_transcript = ""
 
     conn.currently_speaking = False
     conn.is_responding = False
+    
+    # Reset speech detection for fresh interrupt handling
     conn.speech_energy_buffer.clear()
     conn.speech_start_time = None
     conn.user_speech_detected = False
@@ -390,11 +394,10 @@ async def handle_interrupt(call_sid: str):
     conn.last_interim_conf = 0.0
 
     _logger.info(
-        "✅ Interrupt handled:\n"
+        "✅ Interrupt handled (seamless):\n"
         "   Cleared TTS items: %d\n"
-        "   Cleared STT buffer: '%s'\n"
-        "   Ready for new input",
-        cleared, old_buffer[:50] if old_buffer else "(empty)"
+        "   Ready for user input",
+        cleared
     )
 
 
@@ -634,6 +637,7 @@ async def speak_text_streaming(call_sid: str, text: str):
     except:
         pass
 
+    # Set flag immediately - agent is about to speak
     conn.currently_speaking = True
     conn.interrupt_requested = False
     conn.speech_energy_buffer.clear()
@@ -659,8 +663,9 @@ async def speak_text_streaming(call_sid: str, text: str):
             except Exception as e:
                 break
 
+    # Wait for TTS processing to complete
+    # stream_tts_worker will manage currently_speaking flag during streaming
     await conn.tts_queue.join()
-    conn.currently_speaking = False
 
 
 async def setup_streaming_stt(call_sid: str):

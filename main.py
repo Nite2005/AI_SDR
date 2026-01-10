@@ -1241,7 +1241,8 @@ async def media_ws(websocket: WebSocket):
                                     "first_message": agent.first_message,
                                     "voice_id": agent.voice_id,
                                     "model_name": agent.model_name,
-                                    "silence_threshold_sec": agent.silence_threshold_sec
+                                    "silence_threshold_sec": agent.silence_threshold_sec,
+                                    "interrupt_enabled": agent.interrupt_enabled
                                 }
                                 
                                 _logger.info(f"✅ Loaded agent: {agent_id}")
@@ -1325,20 +1326,53 @@ async def media_ws(websocket: WebSocket):
                             except Exception as e:
                                 _logger.error(f"Error sending audio to Deepgram: {e}")
 
-                        from voice_pipeline import calculate_audio_energy, update_baseline
+                        from voice_pipeline import calculate_audio_energy, update_baseline, handle_interrupt
                         energy = calculate_audio_energy(chunk)
                         update_baseline(conn, energy)
 
                         now = time.time()
 
-                        from utils import INTERRUPT_BASELINE_FACTOR, INTERRUPT_MIN_ENERGY
+                        from utils import INTERRUPT_BASELINE_FACTOR, INTERRUPT_MIN_ENERGY, INTERRUPT_ENABLED, INTERRUPT_MIN_SPEECH_MS, INTERRUPT_DEBOUNCE_MS, INTERRUPT_REQUIRE_TEXT
                         energy_threshold = max(
                             conn.baseline_energy * INTERRUPT_BASELINE_FACTOR,
                             INTERRUPT_MIN_ENERGY
                         )
 
-                        # VAD validation & interrupt logic would go here
-                        # (Simplified for space - copy from original file if needed)
+                        # Smart interrupt detection - responsive to user speaking while agent is speaking
+                        if (INTERRUPT_ENABLED and conn.agent_config and 
+                            conn.agent_config.get("interrupt_enabled", True) and 
+                            conn.currently_speaking and not conn.interrupt_requested):
+                            
+                            # Check if user speech energy exceeds threshold
+                            if energy > energy_threshold:
+                                conn.speech_energy_buffer.append(energy)
+                                
+                                # More responsive: require fewer samples for faster detection
+                                if len(conn.speech_energy_buffer) >= 2:
+                                    high_energy_count = sum(1 for e in conn.speech_energy_buffer if e > energy_threshold)
+                                    if high_energy_count >= 2:
+                                        # Mark speech start time for minimum duration check
+                                        if conn.speech_start_time is None:
+                                            conn.speech_start_time = now
+                                        
+                                        # Check if minimum speech duration met
+                                        speech_duration_ms = (now - conn.speech_start_time) * 1000
+                                        if speech_duration_ms >= INTERRUPT_MIN_SPEECH_MS:
+                                            # Check debounce to avoid multiple interrupts
+                                            time_since_last_interrupt = (now - conn.last_interrupt_time) * 1000
+                                            if time_since_last_interrupt >= INTERRUPT_DEBOUNCE_MS:
+                                                # Optional: Check if we have text from user
+                                                has_text = bool(conn.stt_transcript_buffer.strip()) if INTERRUPT_REQUIRE_TEXT else True
+                                                
+                                                if has_text:
+                                                    _logger.info(f"🎯 INTERRUPT TRIGGERED: energy={energy:.0f} threshold={energy_threshold:.0f} duration={speech_duration_ms:.0f}ms buffer_samples={len(conn.speech_energy_buffer)}")
+                                                    conn.last_interrupt_time = now
+                                                    await handle_interrupt(current_call_sid)
+                            else:
+                                # Reset speech detection when energy drops
+                                if conn.speech_start_time is not None:
+                                    conn.speech_energy_buffer.clear()
+                                    conn.speech_start_time = None
 
                         if not conn.currently_speaking and not conn.interrupt_requested:
                             if processing_task is None or processing_task.done():

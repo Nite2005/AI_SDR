@@ -16,3 +16,8 @@ INFO:     Shutting down
 INFO:     Waiting for application shutdown.
 INFO:     Application shutdown complete.
 INFO:     Finished server process [186242]
+2026-01-10 17:47:52,629 WARNING new âš ï¸ VAD timeout - false positive (duration: 1.0s)
+2026-01-10 17:48:00,950 WARNING new âš ï¸ VAD timeout - false positive (duration: 1.0s)
+2026-01-10 17:48:10,689 WARNING new âš ï¸ VAD timeout - false positive (duration: 1.0s)
+2026-01-10 17:48:13,649 WARNING new âš ï¸ VAD timeout - false positive (duration: 1.0s)
+2026-01-10 17:48:16,149 WARNING new âš ï¸ VAD timeout - false positive (duration: 1.0s)
